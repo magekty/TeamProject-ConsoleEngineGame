@@ -13,6 +13,8 @@ class DodgeGame : GameBase
     private int _frame;                       // 지금까지 지난 프레임 수
     private GameState _state = GameState.Playing;
 
+    private int _rockClearItemCount = 1;
+
     public DodgeGame() : base(30, 20)         // 규칙 1: 30×20칸, 초당 10프레임
     {
         _playerX = Width / 2;                 // 맨 아래 줄 가운데
@@ -29,6 +31,11 @@ class DodgeGame : GameBase
         if (key == ConsoleKey.LeftArrow && _playerX > 0) _playerX--;
         if (key == ConsoleKey.RightArrow && _playerX < Width - 1)
             _playerX++;                                   // 규칙 2
+        if (key == ConsoleKey.Z&&_rockClearItemCount>=1)
+        {
+            RockClearItem();
+            _rockClearItemCount--;
+        }
     }
 
     private void Restart()
@@ -37,6 +44,7 @@ class DodgeGame : GameBase
         _playerX = Width / 2;
         _frame = 0;
         _state = GameState.Playing;
+        _rockClearItemCount = 1;
     }
 
     protected override void Update()
@@ -68,10 +76,15 @@ class DodgeGame : GameBase
 
         // 한글은 화면에서 2칸을 차지한다(이슈 #9). 그래서 글은 맨 나중에,
         // 그 줄의 오른쪽에 아무것도 그리지 않는 자리에만 쓴다.
-        DrawText(0, 0, $"시간 {_frame / FramesPerSecond} / {GoalSeconds}초");
+        DrawText(0, 0, $"시간 {_frame / FramesPerSecond} / {GoalSeconds}초   남은 아이템:{_rockClearItemCount}");
         if (_state == GameState.GameOver)
             DrawText(5, 9, "게임 오버 - R: 다시");
         if (_state == GameState.Clear)
             DrawText(6, 9, "성공! - R: 다시");
+    }
+
+    private void RockClearItem()
+    {
+        _rocks.Clear();
     }
 }
