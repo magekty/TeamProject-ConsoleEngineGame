@@ -6,6 +6,7 @@ using ConsoleEngine;
 class DodgeGame : GameBase
 {
     private const int SpawnEveryFrames = 3;   // 규칙 3: 0.3초마다 돌 하나
+    private const int SpawnUpFrames = 100;    // 규칙 3: 10초마다 2배씩 증가
     private const int SpawnItemFrames = 50;   // 규칙 4: 5초마다 아이템 하나
     private const int GoalSeconds = 60;       // 최종 목표: 60초 버티기
 
@@ -15,12 +16,14 @@ class DodgeGame : GameBase
     private int _frame;                       // 지금까지 지난 프레임 수
     private GameState _state = GameState.Playing;
 
+    private int _spawnRockScale = 1;          // 규칙 3: 기본 스폰량, 10초마다 2배 증가
+
     private int _rockClearItemCount = 0;
     private int RockClearItemCount
-    {  get { return _rockClearItemCount; }
-       set { _rockClearItemCount = value > 3 ? 3 : value; } // 아이템 갯수제한 3개
+    {
+        get { return _rockClearItemCount; }
+        set { _rockClearItemCount = value > 3 ? 3 : value; } // 아이템 갯수제한 3개
     }
-
 
     public DodgeGame() : base(30, 20)         // 규칙 1: 30×20칸, 초당 10프레임
     {
@@ -38,7 +41,7 @@ class DodgeGame : GameBase
         if (key == ConsoleKey.LeftArrow && _playerX > 0) _playerX--;
         if (key == ConsoleKey.RightArrow && _playerX < Width - 1)
             _playerX++;                                   // 규칙 2
-        if (key == ConsoleKey.Spacebar&&_rockClearItemCount>=1)
+        if (key == ConsoleKey.Spacebar && _rockClearItemCount >= 1)
         {
             RockClearItem();
             _rockClearItemCount--;
@@ -48,9 +51,11 @@ class DodgeGame : GameBase
     private void Restart()
     {
         _rocks.Clear();
+        _items.Clear();
         _playerX = Width / 2;
         _frame = 0;
         _state = GameState.Playing;
+        _spawnRockScale = 1;
         _rockClearItemCount = 0;
     }
 
@@ -64,25 +69,38 @@ class DodgeGame : GameBase
             return;
         }
 
-        // 돌과 아이템의 스폰 타이밍이 겹칠때 X좌표가 똑같아서 아이템을 먹고 게임오버하는 상황을 방지
-        if (_frame % SpawnEveryFrames == 0&& _frame % SpawnItemFrames == 0) 
+        // 10초(100프레임)마다 떨어지는 돌의 개수를 2배씩 증가
+        if (_frame % SpawnUpFrames == 0)
         {
-            int rockX = Random.Shared.Next(Width);
-            _rocks.Add(new Rock(rockX));
-            int itemX = Random.Shared.Next(Width);
-            while(rockX == itemX) //X좌표가 같으면 같지 않게 될때까지 반복
-                itemX = Random.Shared.Next(Width);
-            _items.Add(new Item(itemX));
-        }
-        else 
-        {
-            if (_frame % SpawnEveryFrames == 0)
-                _rocks.Add(new Rock(Random.Shared.Next(Width)));
-            if (_frame % SpawnItemFrames == 0)
-                _items.Add(new Item(Random.Shared.Next(Width)));
+            _spawnRockScale *= 2;
         }
 
-        
+        bool shouldSpawnRocks = _frame % SpawnEveryFrames == 0;
+        bool shouldSpawnItem = _frame % SpawnItemFrames == 0;
+        HashSet<int> spawnedRockXs = new HashSet<int>();
+
+        if (shouldSpawnRocks)
+        {
+            for (int i = 0; i < _spawnRockScale; i++)
+            {
+                int rockX = Random.Shared.Next(Width);
+                _rocks.Add(new Rock(rockX));
+                spawnedRockXs.Add(rockX);
+            }
+        }
+
+        if (shouldSpawnItem)
+        {
+            int itemX = Random.Shared.Next(Width);
+            // 돌과 아이템이 같은 프레임에 생성될 때, 생성된 돌들과 X좌표가 겹치지 않게 조정
+            if (shouldSpawnRocks && spawnedRockXs.Count < Width)
+            {
+                while (spawnedRockXs.Contains(itemX))
+                    itemX = Random.Shared.Next(Width);
+            }
+            _items.Add(new Item(itemX));
+        }
+
         for (int i = _rocks.Count - 1; i >= 0; i--)
         {
             Rock rock = _rocks[i];
@@ -91,7 +109,8 @@ class DodgeGame : GameBase
                 _state = GameState.GameOver;              // 규칙 4
             if (rock.Y >= Height) _rocks.RemoveAt(i);
         }
-        for(int i= _items.Count - 1; i>=0; i--)
+
+        for (int i = _items.Count - 1; i >= 0; i--)
         {
             Item item = _items[i];
             item.Y++;
@@ -121,12 +140,9 @@ class DodgeGame : GameBase
             DrawText(6, 9, "성공! - R: 다시");
     }
 
-
     // 아이템 효과:화면내에 모든 돌 제거,돌만 제거하고 아이템은 건드리지 않음
     private void RockClearItem()
     {
         _rocks.Clear();
     }
-
-    
 }
